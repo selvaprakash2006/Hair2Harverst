@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import sqlite3 from "sqlite3";
+import { open } from "sqlite";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
@@ -6,18 +7,24 @@ import bcrypt from "bcryptjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database(path.join(__dirname, "..", "..", "hair2harvest.db"));
+const dbPath = path.join(__dirname, "..", "..", "hair2harvest.db");
 
-// Initialize Database
-db.exec(`
+// Create DB connection
+const db = await open({
+  filename: dbPath,
+  driver: sqlite3.Database,
+});
+
+// Initialize tables
+await db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     phone TEXT UNIQUE,
     password TEXT,
-    role TEXT, -- 'salon', 'admin', 'labour'
-    name TEXT, -- This will be used as owner_name for salons
+    role TEXT,
+    name TEXT,
     shop_name TEXT,
-    location TEXT, -- This will be used as shop_location for salons
+    location TEXT,
     contact TEXT,
     reset_token TEXT,
     reset_token_expiry DATETIME
@@ -26,10 +33,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS pickups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     salon_id INTEGER,
-    vendor_id INTEGER, -- This will be the admin or labour who collected it
+    vendor_id INTEGER,
     quantity REAL,
     pickup_date TEXT,
-    status TEXT, -- 'pending', 'accepted', 'collected'
+    status TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(salon_id) REFERENCES users(id),
     FOREIGN KEY(vendor_id) REFERENCES users(id)
@@ -39,22 +46,22 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pickup_id INTEGER,
     labour_id INTEGER,
-    status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(pickup_id) REFERENCES pickups(id),
     FOREIGN KEY(labour_id) REFERENCES users(id)
   );
 `);
 
-// Seed Admin if not exists
-const adminExists = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
+// Seed admin
+const adminExists = await db.get("SELECT * FROM users WHERE role = 'admin'");
+
 if (!adminExists) {
-  const hashedPassword = bcrypt.hashSync("Admin@123", 10);
-  db.prepare("INSERT INTO users (phone, password, role, name) VALUES (?, ?, ?, ?)").run(
-    "9999999999",
-    hashedPassword,
-    "admin",
-    "System Admin"
+  const hashedPassword = await bcrypt.hash("Admin@123", 10);
+
+  await db.run(
+    "INSERT INTO users (phone, password, role, name) VALUES (?, ?, ?, ?)",
+    ["9999999999", hashedPassword, "admin", "System Admin"]
   );
 }
 
