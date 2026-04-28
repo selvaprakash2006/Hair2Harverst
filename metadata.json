@@ -1,0 +1,5 @@
+{
+  "name": "Hair2Harvest",
+  "description": "A platform connecting hair salons with vendors to recycle hair waste into organic fertilizers.",
+  "requestFramePermissions": ["geolocation"]
+}
